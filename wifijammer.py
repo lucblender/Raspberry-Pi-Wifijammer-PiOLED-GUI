@@ -6,7 +6,7 @@ from scapy.all import *
 conf.verb = 0 # Scapy I thought I told you to shut up
 import os
 import sys
-import time
+from time import sleep
 from threading import Thread, Lock
 from subprocess import Popen, PIPE
 from signal import SIGINT, signal
@@ -14,6 +14,7 @@ import argparse
 import socket
 import struct
 import fcntl
+from selector_screen_btn import Selector_screen_btn
 
 # Console colors
 W  = '\033[0m'  # white (normal)
@@ -96,15 +97,34 @@ def get_mon_iface(args):
     monitors, interfaces = iwconfig()
     if args.interface:
         monitor_on = True
-        return args.interface
+        monmode = start_mon_mode(args.interface)   
+        return monmode
     if len(monitors) > 0:
         monitor_on = True
         return monitors[0]
     else:
         # Start monitor mode on a wireless interface
-        print '['+G+'*'+W+'] Finding the most powerful interface...'
+        print('['+G+'*'+W+'] Finding the most powerful interface...')
+               
         interface = get_iface(interfaces)
-        monmode = start_mon_mode(interface)
+        
+            
+        btn.draw_text_screen(["Interface selected:", interface])
+        sleep(2)
+        
+        btn.draw_text_screen(["Scan wifi on interface", interface, "", "please wait"])
+            
+        networkList = get_network_from_interface(interface)
+        
+        toDisplay = []
+        
+        for network in networkList:
+            toDisplay.append(network[1])
+        choosen_interface = btn.draw_text_screen_selector(toDisplay)
+        
+        print(networkList)
+        monmode = start_mon_mode(interface)   
+        print(monmode)
         return monmode
 
 def iwconfig():
@@ -114,7 +134,7 @@ def iwconfig():
         proc = Popen(['iwconfig'], stdout=PIPE, stderr=DN)
     except OSError:
         sys.exit('['+R+'-'+W+'] Could not execute "iwconfig"')
-    for line in proc.communicate()[0].split('\n'):
+    for line in (proc.communicate()[0]).decode('utf-8').split('\n'):
         if len(line) == 0: continue # Isn't an empty string
         if line[0] != ' ': # Doesn't start with space
             wired_search = re.search('eth[0-9]|em[0-9]|p[1-9]p[1-9]', line)
@@ -142,23 +162,43 @@ def get_iface(interfaces):
     for iface in interfaces:
         count = 0
         proc = Popen(['iwlist', iface, 'scan'], stdout=PIPE, stderr=DN)
-        for line in proc.communicate()[0].split('\n'):
+        for line in proc.communicate()[0].decode('utf-8').split('\n'):
             if ' - Address:' in line: # first line in iwlist scan for a new AP
                count += 1
         scanned_aps.append((count, iface))
-        print '['+G+'+'+W+'] Networks discovered by '+G+iface+W+': '+T+str(count)+W
+        print('['+G+'+'+W+'] Networks discovered by '+G+iface+W+': '+T+str(count)+W)
     try:
-        interface = max(scanned_aps)[1]
+        toDisplay = []
+        
+        for aps in scanned_aps:
+            toDisplay.append(aps[1]+": " +str(aps[0])+ " networks")
+        choosen_interface = btn.draw_text_screen_selector(toDisplay)[1]
+        interface = choosen_interface.split(":")[0]
         return interface
     except Exception as e:
         for iface in interfaces:
             interface = iface
-            print '['+R+'-'+W+'] Minor error:',e
-            print '    Starting monitor mode on '+G+interface+W
+            print('['+R+'-'+W+'] Minor error:',e)
+            print('    Starting monitor mode on '+G+interface+W)
             return interface
 
+
+def get_network_from_interface(iface):
+    networks = []
+    proc = Popen(['iwlist', iface, 'scan'], stdout=PIPE, stderr=DN)
+    to_add = []
+    for line in proc.communicate()[0].decode('utf-8').split('\n'):
+        if ' - Address:' in line: # first line in iwlist scan for a new AP
+            to_add.append(line.split(" - Address: ")[1])
+        elif 'ESSID:' in line: # first line in iwlist scan for a new AP
+            to_add.append(line.split("ESSID:")[1].replace('"', ''))
+            networks.append(to_add)
+            to_add = []
+    return networks
+
+
 def start_mon_mode(interface):
-    print '['+G+'+'+W+'] Starting monitor mode off '+G+interface+W
+    print('['+G+'+'+W+'] Starting monitor mode off '+G+interface+W)
     try:
         os.system('ifconfig %s down' % interface)
         os.system('iwconfig %s mode monitor' % interface)
@@ -177,9 +217,9 @@ def mon_mac(mon_iface):
     http://stackoverflow.com/questions/159137/getting-mac-address
     '''
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    info = fcntl.ioctl(s.fileno(), 0x8927, struct.pack('256s', mon_iface[:15]))
-    mac = ''.join(['%02x:' % ord(char) for char in info[18:24]])[:-1]
-    print '['+G+'*'+W+'] Monitor mode: '+G+mon_iface+W+' - '+O+mac+W
+    info = fcntl.ioctl(s.fileno(), 0x8927,  struct.pack('256s', bytes(mon_iface, 'utf-8')[:15]))
+    mac = ''.join('%02x' % b for b in info[18:24])[:-1]
+    print('['+G+'*'+W+'] Monitor mode: '+G+mon_iface+W+' - '+O+mac+W)
     return mac
 
 ########################################
@@ -214,20 +254,20 @@ def channel_hop(mon_iface, args):
             try:
                 proc = Popen(['iw', 'dev', mon_iface, 'set', 'channel', monchannel], stdout=DN, stderr=PIPE)
             except OSError:
-                print '['+R+'-'+W+'] Could not execute "iw"'
+                print('['+R+'-'+W+'] Could not execute "iw"')
                 os.kill(os.getpid(),SIGINT)
                 sys.exit(1)
-            for line in proc.communicate()[1].split('\n'):
+            for line in proc.communicate()[1].decode('utf-8').split('\n'):
                 if len(line) > 2: # iw dev shouldnt display output unless there's an error
                     err = '['+R+'-'+W+'] Channel hopping failed: '+R+line+W
 
         output(err, monchannel)
         if args.channel:
-            time.sleep(.05)
+            sleep(.05)
         else:
             # For the first channel hop thru, do not deauth
             if first_pass == 1:
-                time.sleep(1)
+                sleep(1)
                 continue
 
         deauth(monchannel)
@@ -280,24 +320,39 @@ def deauth(monchannel):
 def output(err, monchannel):
     os.system('clear')
     if err:
-        print err
+        print(err)
     else:
-        print '['+G+'+'+W+'] '+mon_iface+' channel: '+G+monchannel+W+'\n'
+        print('['+G+'+'+W+'] '+mon_iface+' channel: '+G+monchannel+W+'\n')
     if len(clients_APs) > 0:
-        print '                  Deauthing                 ch   ESSID'
+        print('                  Deauthing                 ch   ESSID')
     # Print the deauth list
     with lock:
         for ca in clients_APs:
             if len(ca) > 3:
-                print '['+T+'*'+W+'] '+O+ca[0]+W+' - '+O+ca[1]+W+' - '+ca[2].ljust(2)+' - '+T+ca[3]+W
+                for i in range(0,4):
+                    if not isinstance(ca[i],str):
+                        ca[i] = ca[i].decode('utf-8')
+                print('['+T+'*'+W+'] '+O+ca[0]+W+' - '+O+ca[1]+W+' - '+ca[2].ljust(2)+' - '+T+ca[3]+W)
             else:
-                print '['+T+'*'+W+'] '+O+ca[0]+W+' - '+O+ca[1]+W+' - '+ca[2]
+                for i in range(0,3):
+                    if not isinstance(ca[i],str):
+                        ca[i] = ca[i].decode('utf-8')
+                print('['+T+'*'+W+'] '+O+ca[0]+W+' - '+O+ca[1]+W+' - '+ca[2])
     if len(APs) > 0:
-        print '\n      Access Points     ch   ESSID'
+        print('\n      Access Points     ch   ESSID')
     with lock:
+        a = ["","","",""]
+        index = 0
         for ap in APs:
-            print '['+T+'*'+W+'] '+O+ap[0]+W+' - '+ap[1].ljust(2)+' - '+T+ap[2]+W
-    print ''
+            if(index <=3):
+                a[index] = ap[2]
+            index = index + 1
+            for i in range(0,3):
+                if not isinstance(ap[i],str):
+                    ap[i] = ap[i].decode('utf-8')
+            
+            print('['+T+'*'+W+'] '+O+ap[0]+W+' - '+ap[1].ljust(2)+' - '+T+ap[2]+W)
+    print('')
 
 def noise_filter(skip, addr1, addr2):
     # Broadcast, broadcast, IPv6mcast, spanning tree, spanning tree, multicast, broadcast
@@ -315,6 +370,10 @@ def cb(pkt):
     to the list of deauth targets.
     '''
     global clients_APs, APs
+    #print("start")
+    #print(clients_APs)
+    #print(APs)
+    #TODOprint("stop")
 
     # return these if's keeping clients_APs the same or just reset clients_APs?
     # I like the idea of the tool repopulating the variable more
@@ -417,8 +476,22 @@ def stop(signal, frame):
         remove_mon_iface(mon_iface)
         os.system('service network-manager restart')
         sys.exit('\n['+R+'!'+W+'] Closing')
+ 
+def sniff_function(mon_iface):
+    sniff(iface=mon_iface, store=0, prn=cb)
+
 
 if __name__ == "__main__":
+
+    btn = Selector_screen_btn(20, 8, 7)      
+
+    btn.draw_text_screen(["Welcome! Wifi jammer", " ", "Press >select< button","      to start"])
+    
+    while(btn.selected == False):
+        sleep(0.01)
+    btn.selected = False
+    sleep(0.1)
+    
     if os.geteuid():
         sys.exit('['+R+'-'+W+'] Please run as root')
     clients_APs = []
@@ -426,23 +499,50 @@ if __name__ == "__main__":
     DN = open(os.devnull, 'w')
     lock = Lock()
     args = parse_args()
-    monitor_on = None
+    monitor_on = None    
+    btn.draw_text_screen(["Scan wifi interfaces...", "", "     please wait",""])
     mon_iface = get_mon_iface(args)
+    
+    remove_mon_iface(mon_iface)
+        
+    sniffThread = Thread(target=sniff_function, args=(mon_iface,))
+    sniffThread.daemon = True
+    sniffThread.start()
+    
+    
+    for i in range(10, -1, -1):      
+        sleep(1)
+        btn.draw_text_screen(["Getting wifi packet", "during 10s"," ", str(i)+"s"])
+    print(APs)
+    print(type(APs))
+    APsList = []
+    for AP in APs:
+        APsList.append(AP[2].decode('utf-8'))
+    btn.draw_text_screen(["You'll be asked", "to select the wifi","that will be jammed"])
+    sleep(3)
+    selectedAP = btn.draw_text_screen_selector(APsList)
+    print(selectedAP)
+    print(APs[selectedAP[0]])
+    
+    print(args.accesspoint)
+    args.accesspoint = APs[selectedAP[0]][0]
+    
+    print(args.accesspoint)
+    
     conf.iface = mon_iface
     mon_MAC = mon_mac(mon_iface)
-    first_pass = 1
-
-    # Start channel hopping
-    hop = Thread(target=channel_hop, args=(mon_iface, args))
-    hop.daemon = True
-    hop.start()
+    
+    first_pass = 1   
 
     signal(SIGINT, stop)
 
     try:
-       sniff(iface=mon_iface, store=0, prn=cb)
+        # Start channel hopping
+        sleep(1)
+       #channel_hop(mon_iface, args)
     except Exception as msg:
+        print(msg)
         remove_mon_iface(mon_iface)
         os.system('service network-manager restart')
-        print '\n['+R+'!'+W+'] Closing'
+        print('\n['+R+'!'+W+'] Closing')
         sys.exit(0)
