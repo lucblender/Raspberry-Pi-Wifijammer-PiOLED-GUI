@@ -51,6 +51,17 @@ class Selector_screen_btn:
         
     def up_btn_callback(self, channel):
         self.index = self.index + 1
+        
+    def clear_screen(self): 
+         
+        draw = ImageDraw.Draw(self.image)
+        
+        draw.rectangle((0, 0, self.width, self.height), outline=0, fill=0)
+      
+        # Display image.
+        self.disp.image(self.image)
+        self.disp.show()
+        time.sleep(0.1)
 
     def draw_text_screen(self, line): 
 

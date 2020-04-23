@@ -1,13 +1,36 @@
-wifijammer
+Wifijammer for Raspberry pi with simple GUI on Adafruit Oled screen 
 ==========
 
 Continuously jam all wifi clients and access points within range. The effectiveness of this script is constrained by your wireless card. Alfa cards seem to effectively jam within about a block radius with heavy access point saturation. Granularity is given in the options for more effective targeting. 
 
 
-Requires: python 2.7, python-scapy, a wireless card capable of injection
+
+## Requirement 
+
+Requires: python 3 and a wireless card capable of injection, three buttons (up, down, select) wired between 3 GPIOs on your Pi and the ground (by default select=20, down=8, up=7). Can be modified in wifijammer.py at the instanciation of selector_screen_btn. And finally you need an oled screen by adafruit working with i2c. (https://learn.adafruit.com/adafruit-pioled-128x32-mini-oled-for-raspberry-pi)
+
+```
+sudo apt-get install python3-pip
+sudo pip3  install RPi.GPIO
+sudo pip3 install adafruit-circuitpython-ssd1306
+sudo pip3 install Pillow
+sudo pip3 install scapy
+```
+
+Enable i2c
+```
+sudo raspi-config
+```
+
+For pillow, a fresh rpi installation will need a few libraries:
+```
+sudo apt-get install libopenjp2-7-dev
+sudo apt-get install libtiff5-dev
+```
 
 
-Usage
+
+Usage (from original git)
 -----
 
 

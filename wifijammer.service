@@ -1,0 +1,18 @@
+Description=Wifi jammer service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/wifijammer/wifijammer.py
+WorkingDirectory=/home/pi/wifijammer
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=root
+
+[Unit]
+StartLimitIntervalSec=20
+StartLimitBurst=20
+
+[Install]
+WantedBy=multi-user.target
+
