@@ -195,10 +195,7 @@ def get_network_from_interface_with_gui(iface):
             choosen_network = (network,networkList[network])
             break
         i = i + 1 
-    
-    print("----------------------")
-    print(choosen_network)
-    print("----------------------")
+
     return choosen_network
 
 def get_network_from_interface(iface):
@@ -337,6 +334,17 @@ def deauth(monchannel):
             send(p, inter=float(args.timeinterval), count=int(args.packets))
         totalPackets = totalPackets + len(pkts)
         btn.draw_text_screen(["Sending deauth packet", str(len(pkts)) + " new packets sent","", "total of packets: " + str(totalPackets)])
+        if btn.selected == True:
+            answer = btn.draw_text_screen_two_choices_selector([btn.add_center_padding_text("Do you want to quit?")],["yes","no"])
+            if answer[0] == 0 :
+                btn.draw_text_with_delay([btn.add_center_padding_text("You will quit the") , btn.add_center_padding_text("wifi jammer")],3)
+                answer = btn.draw_text_screen_two_choices_selector([btn.add_center_padding_text("Do you want to "),btn.add_center_padding_text("poweroff?")],["yes","no"])
+                if answer[0] == 0 :
+                    stop(True)
+                else:
+                    stop(False)
+                    
+
 
 def output(err, monchannel):
     os.system('clear')
@@ -490,7 +498,7 @@ def AP_check(addr1, addr2):
             with lock:
                 return clients_APs.append([addr1, addr2, ap[1], ap[2]])
 
-def stop(signal, frame):
+def stop(poweroff):
       
     btn.draw_text_screen([btn.add_center_padding_text("Quitting Wifi jammer"), " ", btn.add_center_padding_text("Goodbye"),""])
     sleep(2)
@@ -500,7 +508,12 @@ def stop(signal, frame):
     else:
         remove_mon_iface(mon_iface)
         os.system('service network-manager restart')
+        if poweroff == True:        
+            os.system('poweroff')
         sys.exit('\n['+R+'!'+W+'] Closing')
+
+def stop_signal(signal, frame):
+    stop(False)
  
 def sniff_function(mon_iface):
     sniff(iface=mon_iface, store=0, prn=cb)
@@ -533,7 +546,7 @@ if __name__ == "__main__":
 
     btn.draw_text_with_delay(["You will jam:", choosen_network[1],choosen_network[0]], 3)
     
-    btn.draw_text_screen(["Deauth will start soon", choosen_network[1],"", btn.add_center_padding_text("please wait")])
+    btn.draw_text_screen(["Deauth 'll start soon", choosen_network[1],"", btn.add_center_padding_text("please wait")])
     args.accesspoint = choosen_network[0]
 
     conf.iface = mon_iface
@@ -548,10 +561,4 @@ if __name__ == "__main__":
         # Start channel hopping
         channel_hop(mon_iface, args)
     except Exception as msg:        
-        btn.draw_text_screen([btn.add_center_padding_text("Quitting Wifi jammer"), " ", btn.add_center_padding_text("Goodbye"),""])
-        sleep(2)        
-        btn.clear_screen()
-        remove_mon_iface(mon_iface)
-        os.system('service network-manager restart')
-        print('\n['+R+'!'+W+'] Closing')
-        sys.exit(0)
+        stop(False)
