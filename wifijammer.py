@@ -175,9 +175,8 @@ def get_iface(interfaces):
 
 
 def get_network_from_interface_with_gui(iface):
-    for i in range(3, -1, -1):      
-        sleep(1)
-        btn.draw_text_screen(["Interface selected:", iface, "", str(i)+"s"])
+
+    btn.draw_text_with_delay(["Interface selected:", iface, ""],3)
     
     btn.draw_text_screen(["Scan wifi interface", iface, "", "      please wait"])
         
@@ -187,7 +186,7 @@ def get_network_from_interface_with_gui(iface):
     
     for network in networkList:
         toDisplay.append(networkList[network])
-    choosen_network_selector = btn.draw_text_screen_selector(toDisplay)
+    choosen_network_selector = btn.draw_text_screen_selector(toDisplay, True)
     
     choosen_network = []
     i = 0
@@ -493,7 +492,7 @@ def AP_check(addr1, addr2):
 
 def stop(signal, frame):
       
-    btn.draw_text_screen(["Quitting Wifi jammer", " ", "      Goodbye",""])
+    btn.draw_text_screen([btn.add_center_padding_text("Quitting Wifi jammer"), " ", btn.add_center_padding_text("Goodbye"),""])
     sleep(2)
     btn.clear_screen()
     if monitor_on:
@@ -515,11 +514,8 @@ if __name__ == "__main__":
 
     btn = Selector_screen_btn(20, 8, 7)      
 
-    btn.draw_text_screen(["Welcome! Wifi jammer", " ", "Press >select< button","      to start"])
-    
-    while(btn.selected == False):
-        sleep(0.01)
-    btn.selected = False
+    btn.draw_text_screen_wait_select([btn.add_center_padding_text("Welcome! Wifi jammer"), " ", btn.add_center_padding_text("Press >select< button"),btn.add_center_padding_text("to start")])
+
     sleep(0.1)
     
     if os.geteuid():
@@ -532,13 +528,12 @@ if __name__ == "__main__":
     
 
     
-    btn.draw_text_screen(["Scan wifi interfaces...", "", "     please wait",""])
+    btn.draw_text_screen(["Scan wifi interfaces...", "", btn.add_center_padding_text("please wait"),""])
     mon_iface, choosen_network= get_mon_iface(args)
+
+    btn.draw_text_with_delay(["You will jam:", choosen_network[1],choosen_network[0]], 3)
     
-    for i in range(3, -1, -1):      
-        sleep(1)
-        btn.draw_text_screen(["You will jam:", choosen_network[1],choosen_network[0], str(i)+"s"])
-    btn.draw_text_screen(["Deauth will start soon", choosen_network[1],"", "    please wait"])
+    btn.draw_text_screen(["Deauth will start soon", choosen_network[1],"", btn.add_center_padding_text("please wait")])
     args.accesspoint = choosen_network[0]
 
     conf.iface = mon_iface
@@ -553,7 +548,7 @@ if __name__ == "__main__":
         # Start channel hopping
         channel_hop(mon_iface, args)
     except Exception as msg:        
-        btn.draw_text_screen(["Quitting Wifi jammer", " ", "      Goodbye",""])
+        btn.draw_text_screen([btn.add_center_padding_text("Quitting Wifi jammer"), " ", btn.add_center_padding_text("Goodbye"),""])
         sleep(2)        
         btn.clear_screen()
         remove_mon_iface(mon_iface)

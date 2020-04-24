@@ -9,6 +9,8 @@ Continuously jam all wifi clients and access points within range. The effectiven
 
 Requires: python 3 and a wireless card capable of injection, three buttons (up, down, select) wired between 3 GPIOs on your Pi and the ground (by default select=20, down=8, up=7). Can be modified in wifijammer.py at the instanciation of selector_screen_btn. And finally you need an oled screen by adafruit working with i2c. (https://learn.adafruit.com/adafruit-pioled-128x32-mini-oled-for-raspberry-pi)
 
+The GUI library driver for the piOled need to be downloaded and in the same folder as wifijammer.py. It can be found in this repository: https://github.com/lucblender/Adafruit-PiOLED-Gui-Driver
+
 ```
 sudo apt-get install python3-pip
 sudo pip3  install RPi.GPIO
